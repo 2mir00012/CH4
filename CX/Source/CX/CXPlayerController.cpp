@@ -1,4 +1,4 @@
-﻿// CXPlayerController.cpp
+// CXPlayerController.cpp
 
 
 #include "CXPlayerController.h"
@@ -60,7 +60,7 @@ void ACXPlayerController::BeginPlay()
 void ACXPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-    InputComponent->BindKey(EKeys::Tab,IE_Pressed,this,&ThisClass::ToggleOptions);
+    InputComponent->BindKey(EKeys::O,IE_Pressed,this,&ThisClass::ToggleOptions);
     InputComponent->BindKey(EKeys::Enter,IE_Pressed,this,&ThisClass::OpenChat);
 	
 	// get the enhanced input subsystem

@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "CXPawn.h"
 #include "CXPlayerController.h"
@@ -94,7 +94,7 @@ void ACXPawn::BeginPlay()
         USphereComponent* Hitbox = NewObject<USphereComponent>(this, *FString::Printf(TEXT("WheelHitbox_%d"), Index));
         AddInstanceComponent(Hitbox);
         Hitbox->SetupAttachment(GetMesh(), Bone);
-        Hitbox->InitSphereRadius(36.0f);
+        Hitbox->InitSphereRadius(65.0f);
         Hitbox->ComponentTags.Add(TEXT("CXWheelHitbox"));
         Hitbox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
         Hitbox->SetCollisionResponseToAllChannels(ECR_Ignore);
@@ -379,6 +379,26 @@ void ACXPawn::CTSAttack_Implementation()
     {
         if (UPrimitiveComponent* HitComponent = HitResult.GetComponent(); HitComponent && HitComponent->ComponentHasTag(TEXT("CXWheelHitbox")))
             HitResult.BoneName = HitComponent->GetAttachSocketName();
+        // A body hit can occlude the wheel query shape. Recheck only this victim,
+        // near the first blocking impact, so walls and distant wheels never count.
+        const bool bHitWheelBone = Victim->ChaosVehicleMovement->WheelSetups.ContainsByPredicate(
+            [&](const FChaosWheelSetup& Setup) { return !HitResult.BoneName.IsNone() && Setup.BoneName == HitResult.BoneName; });
+        if (!bHitWheelBone)
+        {
+            float BestDistanceSq = FMath::Square(65.0f);
+            for (const FChaosWheelSetup& Setup : Victim->ChaosVehicleMovement->WheelSetups)
+            {
+                if (Setup.BoneName.IsNone() || Victim->GetMesh()->GetBoneIndex(Setup.BoneName) == INDEX_NONE) continue;
+                const FVector WheelPosition = Victim->GetMesh()->GetSocketLocation(Setup.BoneName);
+                const FVector Closest = FMath::ClosestPointOnSegment(WheelPosition, Start, End);
+                const float DistanceSq = FVector::DistSquared(WheelPosition, Closest);
+                if (DistanceSq <= BestDistanceSq && FVector::DistSquared(Closest, HitResult.ImpactPoint) <= FMath::Square(150.0f))
+                {
+                    BestDistanceSq = DistanceSq;
+                    HitResult.BoneName = Setup.BoneName;
+                }
+            }
+        }
         bCritical=Victim->ChaosVehicleMovement->WheelSetups.ContainsByPredicate([&](const FChaosWheelSetup& Setup){return !HitResult.BoneName.IsNone()&&Setup.BoneName==HitResult.BoneName;});
         UGameplayStatics::ApplyPointDamage(Victim, 5.0f, GetActorForwardVector(), HitResult, GetController(), this, nullptr);
     }

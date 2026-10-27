@@ -1,4 +1,4 @@
-﻿#include "UI/CXRaceOverlay.h"
+#include "UI/CXRaceOverlay.h"
 #include "UI/CXWidgetHelpers.h"
 #include "CXPlayerController.h"
 #include "CXPawn.h"
@@ -27,7 +27,7 @@ TSharedRef<SWidget> UCXRaceOverlay::RebuildWidget()
   PhaseLabel=Label(TEXT("PhaseLabel"),TEXT("GET READY"),{.5f,0},{.5f,0},{0,29},{250,25},12,Accent(),true);
   Timer=Label(TEXT("MatchTimer"),TEXT("00:10"),{.5f,0},{.5f,0},{0,52},{270,65},43,FLinearColor::White,true);
   Label(TEXT("TimeLabel"),TEXT("MATCH TIME"),{.5f,0},{.5f,0},{0,111},{200,22},10,Muted(),true);
-  auto* Opt=WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(),TEXT("RaceOptions"));StyleButton(Opt);auto OS=Opt->GetStyle();OS.Normal.TintColor=FSlateColor(FLinearColor::Transparent);OS.Hovered.TintColor=FSlateColor(FLinearColor(1,.42f,.065f,.12f));Opt->SetStyle(OS);auto* OL=WidgetTree->ConstructWidget<UTextBlock>();Font(OL,13,true);OL->SetText(FText::FromString(TEXT("TAB  /  옵션")));Opt->AddChild(OL);auto* OSlot=Root->AddChildToCanvas(Opt);OSlot->SetAnchors(FAnchors(1,0));OSlot->SetAlignment({1,0});OSlot->SetPosition({-30,25});OSlot->SetSize({150,42});Opt->OnClicked.AddDynamic(this,&ThisClass::OpenOptions);
+  auto* Opt=WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(),TEXT("RaceOptions"));StyleButton(Opt);auto OS=Opt->GetStyle();OS.Normal.TintColor=FSlateColor(FLinearColor::Transparent);OS.Hovered.TintColor=FSlateColor(FLinearColor(1,.42f,.065f,.12f));Opt->SetStyle(OS);auto* OL=WidgetTree->ConstructWidget<UTextBlock>();Font(OL,13,true);OL->SetText(FText::FromString(TEXT("O  /  옵션")));Opt->AddChild(OL);auto* OSlot=Root->AddChildToCanvas(Opt);OSlot->SetAnchors(FAnchors(1,0));OSlot->SetAlignment({1,0});OSlot->SetPosition({-30,25});OSlot->SetSize({150,42});Opt->OnClicked.AddDynamic(this,&ThisClass::OpenOptions);
   Speed=Label(TEXT("RaceSpeed"),TEXT("000"),{1,1},{1,1},{-75,-82},{240,105},80,FLinearColor::White,true);
   Label(TEXT("SpeedUnit"),TEXT("KM/H"),{1,1},{1,1},{-105,-58},{100,22},12,Muted(),true);
   Gear=Label(TEXT("RaceGear"),TEXT("N"),{1,1},{1,1},{-36,-85},{48,52},33,Accent(),true);
@@ -76,11 +76,9 @@ int32 UCXRaceOverlay::NativePaint(const FPaintArgs& A,const FGeometry& G,const F
  FVector2D Center(Size.X-164,Size.Y-107);for(int32 I=0;I<30;++I){float Ang=FMath::DegreesToRadians(205.f+I*4.5f);FVector2D D(FMath::Cos(Ang),FMath::Sin(Ang));Line(Center+D*133,Center+D*(I%5==0?150:143),I/29.f<=SpeedFraction?Orange:FLinearColor(.62f,.70f,.75f,.35f),I%5==0?4:3);}
  if(auto* PC=Cast<ACXPlayerController>(GetOwningPlayer()))if(auto* GS=GetWorld()->GetGameState<ACXGameState>();GS&&GS->GetCurrentGameState()==EGameState::Playing)
  {
-  FVector2D Aim(Size.X*.5f,Size.Y*.5f);FLinearColor White(1,1,1,.7f);
-  Line(Aim+FVector2D(-12,0),Aim+FVector2D(-6,0),White,1.3f);Line(Aim+FVector2D(6,0),Aim+FVector2D(12,0),White,1.3f);
-  Line(Aim+FVector2D(0,-12),Aim+FVector2D(0,-6),White,1.3f);Line(Aim+FVector2D(0,6),Aim+FVector2D(0,12),White,1.3f);
+  FVector2D Aim(Size.X*.5f,Size.Y*.5f);
   float Fade=FMath::Clamp(float((PC->HitFeedbackUntil-GetWorld()->GetTimeSeconds())/.65),0.f,1.f);
-  if(Fade>0){FLinearColor Color=PC->bLastHitCritical?FLinearColor(1,.06f,.025f,Fade):FLinearColor(1,1,1,Fade);float Span=PC->bLastHitCritical?17.f:13.f;for(float X:{-1.f,1.f})for(float Y:{-1.f,1.f})Line(Aim+FVector2D(X*7,Y*7),Aim+FVector2D(X*Span,Y*Span),Color,PC->bLastHitCritical?3.f:2.f);}
+  if(Fade>0 && PC->bLastHitCritical){FLinearColor Color=PC->bLastHitCritical?FLinearColor(1,.06f,.025f,Fade):FLinearColor(1,1,1,Fade);float Span=PC->bLastHitCritical?17.f:13.f;for(float X:{-1.f,1.f})for(float Y:{-1.f,1.f})Line(Aim+FVector2D(X*7,Y*7),Aim+FVector2D(X*Span,Y*Span),Color,PC->bLastHitCritical?3.f:2.f);}
   float Damage=FMath::Clamp(float((PC->DamageFeedbackUntil-GetWorld()->GetTimeSeconds())/.55),0.f,1.f);
   if(Damage>0){FLinearColor Red(1,.04f,.01f,Damage*.65f);Line({2,2},{Size.X-2,2},Red,4);Line({2,Size.Y-2},{Size.X-2,Size.Y-2},Red,4);Line({2,2},{2,Size.Y-2},Red,4);Line({Size.X-2,2},{Size.X-2,Size.Y-2},Red,4);}
  }

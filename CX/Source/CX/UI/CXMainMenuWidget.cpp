@@ -95,7 +95,7 @@ TSharedRef<SWidget> UCXMainMenuWidget::RebuildWidget()
         USizeBox* AddressHeight=WidgetTree->ConstructWidget<USizeBox>();AddressHeight->SetHeightOverride(42);
         Content->AddChildToVerticalBox(AddressHeight)->SetPadding(FMargin(0,0,0,10));
         ServerAddress=WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass(),TEXT("ServerAddress"));
-        ServerAddress->SetHintText(FText::FromString(TEXT("예: 127.0.0.1:7777")));AddressHeight->AddChild(ServerAddress);
+        ServerAddress->SetHintText(FText::FromString(TEXT("예: 000.000.000.000:0000")));AddressHeight->AddChild(ServerAddress);
         CXWidgets::StyleInput(ServerAddress);
         AddMenuButton(Content,TEXT("JoinButton"),FText::FromString(TEXT("서버 접속")),false)->OnClicked.AddDynamic(this,&UCXMainMenuWidget::JoinGame);
         AddMenuButton(Content,TEXT("OptionsButton"),FText::FromString(TEXT("옵션")),false)->OnClicked.AddDynamic(this,&ThisClass::OpenOptions);
