@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
@@ -30,6 +30,9 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category = "Mine")
     TObjectPtr<USoundBase> ExplosionSound;
+
+    UPROPERTY(EditDefaultsOnly,Category="Mine|Effects") TObjectPtr<UParticleSystem> ExplosionSmoke;
+    UPROPERTY(EditDefaultsOnly,Category="Mine|Effects") TObjectPtr<UParticleSystem> ExplosionSparks;
 
     UFUNCTION()
     void OnVehicleOverlap(UPrimitiveComponent* Component, AActor* OtherActor, UPrimitiveComponent* OtherComponent,

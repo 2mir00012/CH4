@@ -15,10 +15,12 @@ class CX_API UChatUI : public UUserWidget
 
 public:
     void OnNewChatMessage(const FString& Sender, const FString& Message);
+    void FocusInput();
 
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
+    virtual FReply NativeOnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& Event) override;
 
     UFUNCTION()
     void OnChatInputTextCommitted(const FText& Text, ETextCommit::Type CommitMethod);

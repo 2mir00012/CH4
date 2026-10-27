@@ -7,5 +7,5 @@ UCXWheelFront::UCXWheelFront()
 {
 	AxleType = EAxleType::Front;
 	bAffectedBySteering = true;
-	MaxSteerAngle = 40.f;
+	MaxSteerAngle = 52.f;
 }

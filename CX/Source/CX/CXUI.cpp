@@ -74,3 +74,5 @@ FText UCXUI::GetGameStateInfoText() const
     }
     return FText::FromString(GameInfo);
 }
+
+void UCXUI::FocusChat(){if(ChatUI)ChatUI->FocusInput();}

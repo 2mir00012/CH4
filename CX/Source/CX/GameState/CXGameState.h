@@ -5,6 +5,15 @@
 #include "CXGameState.generated.h"
 
 class ACXPlayerState;
+USTRUCT()
+struct FCXFinalResult
+{
+    GENERATED_BODY()
+    UPROPERTY() FString Name;
+    UPROPERTY() int32 PlayerId=0;
+    UPROPERTY() int32 Coins=0;
+    UPROPERTY() bool bWinner=false;
+};
 
 UENUM(BlueprintType, meta = (ScriptName = "CXGamePhase"))
 enum class EGameState : uint8
@@ -19,6 +28,9 @@ class CX_API ACXGameState : public AGameStateBase
 {
     GENERATED_BODY()
 public:
+    UPROPERTY(Replicated) TArray<FCXFinalResult> FinalResults;
+    UPROPERTY(Replicated) double RaceStartedAt=0.0;
+    void CaptureFinalResults();
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     void SetGameState(EGameState NewGameState);
     void SetRemainingTime(int32 NewRemainingTime);

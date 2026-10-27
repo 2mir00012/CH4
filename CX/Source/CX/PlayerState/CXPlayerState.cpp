@@ -1,10 +1,12 @@
 #include "PlayerState/CXPlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
+#include "UI/CXGameInstance.h"
 
 void ACXPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(ThisClass, PaintIndex);
     DOREPLIFETIME_CONDITION(ThisClass, Coins, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(ThisClass, BonusMaxSpeed, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(ThisClass, WheelSpeedPenalty, COND_OwnerOnly);
@@ -74,4 +76,12 @@ void ACXPlayerState::EndPlay(const EEndPlayReason::Type EndPlayReason)
 FString ACXPlayerState::GetPlayerStateInfo() const
 {
     return FString::Printf(TEXT("Coins: %d, BonusMaxSpeed: %.2f | Wheel penalty: %.1f"), Coins, BonusMaxSpeed, WheelSpeedPenalty);
+}
+
+void ACXPlayerState::SetProfile(const FString& Name,int32 Color)
+{
+    if(!HasAuthority()) return;
+    SetPlayerName(UCXGameInstance::CleanNickname(Name));
+    PaintIndex=FMath::Clamp(Color,0,UCXGameInstance::PaintCount-1);
+    ForceNetUpdate();
 }

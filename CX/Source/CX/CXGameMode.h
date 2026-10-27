@@ -6,6 +6,8 @@
 #include "GameFramework/GameModeBase.h"
 #include "CXGameMode.generated.h"
 
+class APlayerStart;
+
 UCLASS()
 class CX_API ACXGameMode : public AGameModeBase
 {

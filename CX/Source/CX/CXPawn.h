@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
@@ -134,9 +134,35 @@ public:
     float GetThrottleDisabledRemaining() const;
 
     void ApplyThrottleFailure(float Duration);
+    float GetMineCooldownRemaining() const;
+    void ApplyImpactReaction(const FVector& Direction,bool bMine);
+    UFUNCTION(Client,Reliable) void ClientImpactReaction(FVector_NetQuantizeNormal Direction,bool bMine);
+    void ApplyPhysicsImpact(const FVector& Direction,bool bMine);
+    UPROPERTY(EditDefaultsOnly,Category="Vehicle|Effects") TObjectPtr<UParticleSystem> WheelHitSmoke;
+
+    bool IsOverturned() const { return GetActorUpVector().Z<0.25f; }
+    float GetAutoRecoveryRemaining() const;
+    bool RecoverToSafeGround();
+    void ApplyRecoveryTransform(const FTransform& Transform);
+    UFUNCTION(Client,Reliable) void ClientRecoverVehicle(const FTransform& Transform);
+    UPROPERTY(Replicated) double AutoRecoverAt=0.;
+    void UpdateRecovery(float Delta);
+    UFUNCTION(BlueprintCallable, Category="Vehicle|Handling") void ConfigureResponsiveHandling();
+    FVector LastSafeGround=FVector::ZeroVector;
+    float LastSafeYaw=0.f;
+    bool bHasSafeGround=false;
+    float GroundSampleTime=0.f;
+    void SetDriveMenuOpen(bool bOpen);
+    UFUNCTION(Server,Reliable) void ServerSetDriveMenuOpen(bool bOpen);
+    UPROPERTY(VisibleAnywhere) TObjectPtr<class UWidgetComponent> DriverNameplate;
+    UPROPERTY(Transient) TArray<TObjectPtr<class UMaterialInstanceDynamic>> PaintMaterials;
+    void RefreshProfileVisuals();
+    int32 CachedPaintIndex=-1;
+    bool bDriveMenuOpen=false;
+    UPROPERTY(Replicated) double MineReadyAt=0.;
 
     UFUNCTION(NetMulticast, Unreliable)
-    void MulticastHitEffect(const FVector& TraceStart, const FVector& TraceEnd, bool bHitVehicle, const FVector& ImpactPoint, const FVector& ImpactNormal);
+    void MulticastHitEffect(const FVector& TraceStart, const FVector& TraceEnd, bool bHitVehicle, const FVector& ImpactPoint, const FVector& ImpactNormal,bool bCritical=false);
 
 	// End Actor interface
 

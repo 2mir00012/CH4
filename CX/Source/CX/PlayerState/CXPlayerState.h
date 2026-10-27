@@ -13,6 +13,8 @@ public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Profile") int32 PaintIndex=0;
+    void SetProfile(const FString& Name,int32 Color);
     int32 GetCoins() const { return Coins; }
     float GetBonusMaxSpeed() const { return BonusMaxSpeed; }
     float GetWheelSpeedPenalty() const { return WheelSpeedPenalty; }

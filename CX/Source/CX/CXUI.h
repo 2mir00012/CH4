@@ -26,6 +26,7 @@ public:
     FText GetGameStateInfoText() const;
 
     void OnNewChatMessage(const FString& InSender, const FString& InMessage);
+    void FocusChat();
 
 protected:
     UPROPERTY(meta = (BindWidget))

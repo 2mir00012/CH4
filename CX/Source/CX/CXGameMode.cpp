@@ -144,6 +144,7 @@ void ACXGameMode::HandlePlayingTimerTick()
 
 void ACXGameMode::FinishGame()
 {
+    GetWorldTimerManager().ClearTimer(GameTimerHandle);
     ACXGameState* State = GetGameState<ACXGameState>();
     if (!IsValid(State)) return;
     int32 HighestCoins = -1;
@@ -166,6 +167,7 @@ void ACXGameMode::FinishGame()
         }
     }
     State->SetWinners(Winners);
+    State->CaptureFinalResults();
     State->SetRemainingTime(0);
     State->SetGameState(EGameState::Finished);
     UE_LOG(LogTemp, Display, TEXT("Game finished: highestCoins=%d winners=%d"), HighestCoins, Winners.Num());

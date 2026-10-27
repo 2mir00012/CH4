@@ -1,4 +1,4 @@
-// CXPlayerController.h
+﻿// CXPlayerController.h
 
 #pragma once
 
@@ -65,8 +65,25 @@ protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
+    UFUNCTION(Client,Reliable) void ClientShowHitFeedback(bool bCritical);
+    UFUNCTION(Client,Reliable) void ClientShowDamageFeedback(bool bMine);
+    double HitFeedbackUntil=-1.0;
+    double DamageFeedbackUntil=-1.0;
+    bool bLastHitCritical=false;
+    bool bLastDamageWasMine=false;
+    int32 HitFeedbackSequence=0;
+    int32 DamageFeedbackSequence=0;
+    UFUNCTION(Server,Reliable) void ServerSetProfile(const FString& Name,int32 PaintIndex);
+    UFUNCTION(Server,Reliable) void ServerRestartMatch();
+    void OpenOptions();
+    void CloseOptions();
+    void ToggleOptions();
+    void OpenChat();
+    UPROPERTY(Transient) TObjectPtr<class UCXOptionsWidget> OptionsWidget;
+    UPROPERTY(Transient) TObjectPtr<class UCXRaceOverlay> RaceOverlay;
+    bool bProfileSent=false;
 
-	UFUNCTION(Server, Reliable)
+    UFUNCTION(Server, Reliable)
 	void CTSChatMessage(const FString& Message);
 
 	UFUNCTION(Client, Reliable)

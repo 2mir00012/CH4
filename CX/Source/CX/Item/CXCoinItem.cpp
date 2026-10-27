@@ -1,3 +1,4 @@
+#include "UI/CXGameInstance.h"
 #include "Item/CXCoinItem.h"
 #include "Components/SceneComponent.h"
 #include "Components/SphereComponent.h"
@@ -73,7 +74,7 @@ void ACXCoinItem::MulticastPickupEffects_Implementation()
     }
     if (IsValid(PickupSound))
     {
-        UGameplayStatics::PlaySoundAtLocation(World, PickupSound, GetActorLocation());
+        UGameplayStatics::PlaySoundAtLocation(World, PickupSound, GetActorLocation(), UCXGameInstance::EffectVolume(this));
     }
     UE_LOG(LogTemp, Display, TEXT("CXCoinItem pickup effect received: mode=%d"), static_cast<int32>(World->GetNetMode()));
 }

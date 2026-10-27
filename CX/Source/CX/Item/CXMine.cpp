@@ -1,4 +1,7 @@
-#include "Item/CXMine.h"
+﻿#include "Item/CXMine.h"
+#include "UI/CXGameInstance.h"
+#include "CXPlayerController.h"
+#include "Effects/CXEffectHelpers.h"
 #include "CXPawn.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -27,6 +30,12 @@ ACXMine::ACXMine()
     MineMesh->SetRelativeScale3D(FVector(1.4f, 1.4f, 0.18f));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Mesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
     if (Mesh.Succeeded()) MineMesh->SetStaticMesh(Mesh.Object);
+    static ConstructorHelpers::FObjectFinder<UParticleSystem> Blast(TEXT("/Game/StarterContent/Particles/P_Explosion.P_Explosion"));
+    static ConstructorHelpers::FObjectFinder<UParticleSystem> Smoke(TEXT("/Game/StarterContent/Particles/P_Smoke.P_Smoke"));
+    static ConstructorHelpers::FObjectFinder<UParticleSystem> Sparks(TEXT("/Game/StarterContent/Particles/P_Sparks.P_Sparks"));
+    if(Blast.Succeeded())ExplosionParticle=Blast.Object;
+    if(Smoke.Succeeded())ExplosionSmoke=Smoke.Object;
+    if(Sparks.Succeeded())ExplosionSparks=Sparks.Object;
     InitialLifeSpan = 30.0f;
 }
 
@@ -61,6 +70,8 @@ void ACXMine::OnVehicleOverlap(UPrimitiveComponent* Component, AActor* OtherActo
     bDetonated = true;
     TriggerSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     Vehicle->ApplyThrottleFailure(2.0f);
+    Vehicle->ApplyImpactReaction(Vehicle->GetActorLocation()-GetActorLocation(),true);
+    if(auto* PC=Cast<ACXPlayerController>(Vehicle->GetController()))PC->ClientShowDamageFeedback(true);
     MulticastExplosion();
     Destroy();
 }
@@ -68,8 +79,11 @@ void ACXMine::OnVehicleOverlap(UPrimitiveComponent* Component, AActor* OtherActo
 void ACXMine::MulticastExplosion_Implementation()
 {
     if (GetNetMode() == NM_DedicatedServer) return;
-    if (ExplosionParticle) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionParticle, GetActorLocation());
-    if (ExplosionSound) UGameplayStatics::PlaySoundAtLocation(GetWorld(), ExplosionSound, GetActorLocation());
+    const FVector Origin=GetActorLocation()+FVector(0,0,30);
+    CXEffects::Burst(GetWorld(),ExplosionParticle,Origin,FRotator::ZeroRotator,1.65f,.25f);
+    CXEffects::Burst(GetWorld(),ExplosionSmoke,Origin,FRotator::ZeroRotator,.75f,.45f);
+    CXEffects::Burst(GetWorld(),ExplosionSparks,Origin,FRotator::ZeroRotator,1.2f,.18f);
+    if (ExplosionSound) UGameplayStatics::PlaySoundAtLocation(GetWorld(), ExplosionSound, GetActorLocation(), UCXGameInstance::EffectVolume(this));
     UE_LOG(LogTemp, Display, TEXT("Mine explosion effects: mode=%d particle=%d sound=%d"),
         int32(GetNetMode()), IsValid(ExplosionParticle), IsValid(ExplosionSound));
 }

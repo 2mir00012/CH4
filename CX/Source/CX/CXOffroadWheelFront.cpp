@@ -7,7 +7,7 @@ UCXOffroadWheelFront::UCXOffroadWheelFront()
 {
 	WheelRadius = 50.0f;
 	CorneringStiffness = 750.0f;
-	FrictionForceMultiplier = 4.0f;
+	FrictionForceMultiplier = 4.5f;
 	bAffectedByEngine = true;
 
 	SuspensionMaxRaise = 20.0f;
