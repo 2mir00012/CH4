@@ -72,3 +72,16 @@ Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+# Nested Unreal project generated files
+**/Binaries/
+**/Intermediate/
+**/Saved/
+**/DerivedDataCache/
+**/.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# Download originals; runtime assets are under Content/CH4_Assets
+/CX/CH4_Assets/

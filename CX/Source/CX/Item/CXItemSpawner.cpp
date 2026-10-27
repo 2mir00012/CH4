@@ -6,13 +6,14 @@
 ACXItemSpawner::ACXItemSpawner()
 {
     PrimaryActorTick.bCanEverTick = false;
+    bReplicates = true;
     SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot")));
 }
 
 void ACXItemSpawner::BeginPlay()
 {
     Super::BeginPlay();
-    if (HasAuthority())
+    if (HasAuthority() && GetNetMode() != NM_Client)
     {
         SpawnItem();
     }
@@ -21,7 +22,7 @@ void ACXItemSpawner::BeginPlay()
 void ACXItemSpawner::SpawnItem()
 {
     UWorld* World = GetWorld();
-    if (!HasAuthority() || bEndingPlay || !World || !IsValid(ItemClass) || IsValid(SpawnedItem))
+    if (!HasAuthority() || GetNetMode() == NM_Client || bEndingPlay || !World || !IsValid(ItemClass) || IsValid(SpawnedItem))
     {
         return;
     }
