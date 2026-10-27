@@ -1,0 +1,15 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "c:\\mir\\ch4\\cx\\source\\cx\\subsystem\\chatsubsystem.cpp",
+        "ProvidedModule": "",
+        "PCH": "c:\\mir\\ch4\\cx\\intermediate\\build\\win64\\x64\\cxeditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "c:\\mir\\ch4\\cx\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\cx\\definitions.cx.h",
+            "c:\\mir\\ch4\\cx\\source\\cx\\subsystem\\chatsubsystem.h",
+            "c:\\mir\\ch4\\cx\\intermediate\\build\\win64\\unrealeditor\\inc\\cx\\uht\\chatsubsystem.generated.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

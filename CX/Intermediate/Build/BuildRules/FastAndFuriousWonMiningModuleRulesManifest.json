@@ -1,0 +1,8 @@
+{
+	"SourceFiles": [
+		"C:\\MIR\\CH4-2-FastAndFuriousWonMining\\FastAndFuriousWonMining\\Source\\CX\\CX.Build.cs",
+		"C:\\MIR\\CH4-2-FastAndFuriousWonMining\\FastAndFuriousWonMining\\Source\\FastAndFuriousWonMining.Target.cs",
+		"C:\\MIR\\CH4-2-FastAndFuriousWonMining\\FastAndFuriousWonMining\\Source\\FastAndFuriousWonMiningEditor.Target.cs"
+	],
+	"EngineVersion": "5.6.1"
+}
