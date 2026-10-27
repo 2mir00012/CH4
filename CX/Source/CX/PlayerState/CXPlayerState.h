@@ -11,12 +11,15 @@ class CX_API ACXPlayerState : public APlayerState
 
 public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
     int32 GetCoins() const { return Coins; }
     float GetBonusMaxSpeed() const { return BonusMaxSpeed; }
+    float GetWheelSpeedPenalty() const { return WheelSpeedPenalty; }
     void AddCoins(int32 Amount);
     bool TryRemoveCoins(int32 Amount);
     void AddBonusMaxSpeed(float Amount);
+    void ApplyWheelSpeedPenalty(float Amount);
 
     UFUNCTION(BlueprintPure, Category = "Player State")
     FString GetPlayerStateInfo() const;
@@ -27,4 +30,15 @@ protected:
 
     UPROPERTY(Replicated)
     float BonusMaxSpeed = 0.0f;
+
+    UPROPERTY(Replicated)
+    float WheelSpeedPenalty = 0.0f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Wheel Damage", meta = (ClampMin = "0.1"))
+    float WheelRecoveryPerSecond = 5.0f;
+
+private:
+    float CollectedSpeedBonus = 0.0f;
+    FTimerHandle WheelRecoveryTimer;
+    void RecoverWheelSpeed();
 };

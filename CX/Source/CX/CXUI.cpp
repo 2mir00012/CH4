@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "UI/ChatUI.h"
 #include "PlayerState/CXPlayerState.h"
+#include "CXPawn.h"
 
 void UCXUI::OnNewChatMessage(const FString& InSender, const FString& InMessage)
 {
@@ -34,7 +35,13 @@ FText UCXUI::GetPlayerStateInfoText() const
 {
     if (const ACXPlayerState* State = GetOwningPlayerState<ACXPlayerState>())
     {
-        return FText::FromString(State->GetPlayerStateInfo());
+        FString Info = State->GetPlayerStateInfo();
+        if (const ACXPawn* Vehicle = Cast<ACXPawn>(GetOwningPlayerPawn()))
+        {
+            if (Vehicle->IsThrottleDisabled())
+                Info += FString::Printf(TEXT(" | Throttle disabled: %.1fs"), Vehicle->GetThrottleDisabledRemaining());
+        }
+        return FText::FromString(Info);
     }
     return FText::FromString(TEXT("Coins: 0, BonusMaxSpeed: 0.00"));
 }
@@ -44,7 +51,7 @@ FText UCXUI::GetGameStateInfoText() const
     const ACXGameState* State = GetWorld() ? GetWorld()->GetGameState<ACXGameState>() : nullptr;
     if (!IsValid(State))
     {
-        return FText::FromString(TEXT("Waiting | Time: 5"));
+        return FText::FromString(TEXT("Waiting | Time: 10"));
     }
 
     FString GameInfo = State->GetGameStateInfo();

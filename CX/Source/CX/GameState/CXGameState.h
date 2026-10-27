@@ -40,7 +40,7 @@ protected:
     EGameState CurrentGameState = EGameState::Waiting;
 
     UPROPERTY(Replicated)
-    int32 RemainingTime = 5;
+    int32 RemainingTime = 10;
 
     UPROPERTY(Replicated)
     TArray<TObjectPtr<ACXPlayerState>> Winners;

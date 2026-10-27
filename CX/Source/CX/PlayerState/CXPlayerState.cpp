@@ -1,11 +1,13 @@
 #include "PlayerState/CXPlayerState.h"
 #include "Net/UnrealNetwork.h"
+#include "TimerManager.h"
 
 void ACXPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME_CONDITION(ThisClass, Coins, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(ThisClass, BonusMaxSpeed, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(ThisClass, WheelSpeedPenalty, COND_OwnerOnly);
 }
 
 void ACXPlayerState::AddCoins(int32 Amount)
@@ -36,11 +38,40 @@ void ACXPlayerState::AddBonusMaxSpeed(float Amount)
     {
         return;
     }
-    BonusMaxSpeed += Amount;
+    CollectedSpeedBonus += Amount;
+    BonusMaxSpeed = CollectedSpeedBonus + WheelSpeedPenalty;
     ForceNetUpdate();
+}
+
+void ACXPlayerState::ApplyWheelSpeedPenalty(float Amount)
+{
+    if (!HasAuthority() || !GetWorld() || !FMath::IsFinite(Amount) || Amount <= 0.0f) return;
+    WheelSpeedPenalty = FMath::Max(-80.0f, WheelSpeedPenalty - Amount);
+    BonusMaxSpeed = CollectedSpeedBonus + WheelSpeedPenalty;
+    ForceNetUpdate();
+    GetWorldTimerManager().SetTimer(WheelRecoveryTimer, this, &ACXPlayerState::RecoverWheelSpeed, 0.1f, true);
+}
+
+void ACXPlayerState::RecoverWheelSpeed()
+{
+    if (!HasAuthority()) return;
+    WheelSpeedPenalty = FMath::Min(0.0f, WheelSpeedPenalty + WheelRecoveryPerSecond * 0.1f);
+    if (WheelSpeedPenalty >= -KINDA_SMALL_NUMBER)
+    {
+        WheelSpeedPenalty = 0.0f;
+        GetWorldTimerManager().ClearTimer(WheelRecoveryTimer);
+    }
+    BonusMaxSpeed = CollectedSpeedBonus + WheelSpeedPenalty;
+    ForceNetUpdate();
+}
+
+void ACXPlayerState::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    GetWorldTimerManager().ClearTimer(WheelRecoveryTimer);
+    Super::EndPlay(EndPlayReason);
 }
 
 FString ACXPlayerState::GetPlayerStateInfo() const
 {
-    return FString::Printf(TEXT("Coins: %d, BonusMaxSpeed: %.2f"), Coins, BonusMaxSpeed);
+    return FString::Printf(TEXT("Coins: %d, BonusMaxSpeed: %.2f | Wheel penalty: %.1f"), Coins, BonusMaxSpeed, WheelSpeedPenalty);
 }

@@ -3,6 +3,12 @@
 #include "CXPawn.h"
 #include "CXWheelFront.h"
 #include "PlayerState/CXPlayerState.h"
+#include "GameState/CXGameState.h"
+#include "Item/CXMine.h"
+#include "Engine/DamageEvents.h"
+#include "Net/UnrealNetwork.h"
+#include "TimerManager.h"
+#include "Components/SphereComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "DrawDebugHelpers.h"
 #include "Particles/ParticleSystem.h"
@@ -56,7 +62,102 @@ ACXPawn::ACXPawn()
 
 	// get the Chaos Wheeled movement component
 	ChaosVehicleMovement = CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovement());
+    MineClass = ACXMine::StaticClass();
+}
 
+void ACXPawn::BeginPlay()
+{
+    Super::BeginPlay();
+    GetMesh()->SetGenerateOverlapEvents(true);
+    // Query shapes follow actual wheel bones, including wheels whose physics bodies
+    // are disabled by the vehicle template. They only block the attack trace.
+    for (int32 Index = 0; Index < ChaosVehicleMovement->WheelSetups.Num(); ++Index)
+    {
+        const FName Bone = ChaosVehicleMovement->WheelSetups[Index].BoneName;
+        if (Bone.IsNone() || GetMesh()->GetBoneIndex(Bone) == INDEX_NONE) continue;
+        USphereComponent* Hitbox = NewObject<USphereComponent>(this, *FString::Printf(TEXT("WheelHitbox_%d"), Index));
+        AddInstanceComponent(Hitbox);
+        Hitbox->SetupAttachment(GetMesh(), Bone);
+        Hitbox->InitSphereRadius(36.0f);
+        Hitbox->ComponentTags.Add(TEXT("CXWheelHitbox"));
+        Hitbox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        Hitbox->SetCollisionResponseToAllChannels(ECR_Ignore);
+        Hitbox->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+        Hitbox->SetGenerateOverlapEvents(false);
+        Hitbox->SetCanEverAffectNavigation(false);
+        Hitbox->RegisterComponent();
+    }
+    ApplyControlRestrictions();
+}
+
+void ACXPawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    GetWorldTimerManager().ClearTimer(ThrottleFailureTimer);
+    Super::EndPlay(EndPlayReason);
+}
+
+void ACXPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME_CONDITION(ThisClass, ThrottleDisabledUntil, COND_OwnerOnly);
+}
+
+bool ACXPawn::IsMatchPlaying() const
+{
+    const ACXGameState* State = GetWorld() ? GetWorld()->GetGameState<ACXGameState>() : nullptr;
+    return IsValid(State) && State->GetCurrentGameState() == EGameState::Playing;
+}
+
+float ACXPawn::GetThrottleDisabledRemaining() const
+{
+    if (!GetWorld()) return 0.0f;
+    const AGameStateBase* State = GetWorld()->GetGameState();
+    const double Now = State ? State->GetServerWorldTimeSeconds() : GetWorld()->GetTimeSeconds();
+    return FMath::Max(0.0, ThrottleDisabledUntil - Now);
+}
+
+bool ACXPawn::IsThrottleDisabled() const
+{
+    return GetThrottleDisabledRemaining() > 0.0f;
+}
+
+void ACXPawn::ApplyThrottleFailure(float Duration)
+{
+    if (!HasAuthority() || !IsMatchPlaying() || !FMath::IsFinite(Duration) || Duration <= 0.0f) return;
+    ThrottleDisabledUntil = GetWorld()->GetGameState()->GetServerWorldTimeSeconds() + Duration;
+    ChaosVehicleMovement->SetThrottleInput(0.0f);
+    ForceNetUpdate();
+    GetWorldTimerManager().SetTimer(ThrottleFailureTimer, this, &ACXPawn::ClearThrottleFailure, Duration, false);
+}
+
+void ACXPawn::ClearThrottleFailure()
+{
+    ThrottleDisabledUntil = 0.0;
+    ForceNetUpdate();
+}
+
+void ACXPawn::OnRep_ThrottleDisabledUntil()
+{
+    if (IsThrottleDisabled()) ChaosVehicleMovement->SetThrottleInput(0.0f);
+}
+
+void ACXPawn::ApplyControlRestrictions()
+{
+    if (!HasAuthority() && !IsLocallyControlled()) return;
+    if (!IsMatchPlaying())
+    {
+        bPhaseHandbrakeLocked = true;
+        bManualHandbrake = false;
+        ChaosVehicleMovement->SetThrottleInput(0.0f);
+        ChaosVehicleMovement->SetSteeringInput(0.0f);
+        ChaosVehicleMovement->SetHandbrakeInput(true);
+    }
+    else if (bPhaseHandbrakeLocked)
+    {
+        bPhaseHandbrakeLocked = false;
+        ChaosVehicleMovement->SetHandbrakeInput(bManualHandbrake);
+    }
+    if (IsThrottleDisabled()) ChaosVehicleMovement->SetThrottleInput(0.0f);
 }
 
 void ACXPawn::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -68,6 +169,10 @@ void ACXPawn::SetupPlayerInputComponent(class UInputComponent* PlayerInputCompon
         if (AttackAction)
         {
             EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &ACXPawn::InputAttack);
+        }
+        if (MineAction)
+        {
+            EnhancedInputComponent->BindAction(MineAction, ETriggerEvent::Started, this, &ACXPawn::InputPlaceMine);
         }
 
 		// steering 
@@ -94,7 +199,7 @@ void ACXPawn::SetupPlayerInputComponent(class UInputComponent* PlayerInputCompon
 		EnhancedInputComponent->BindAction(ToggleCameraAction, ETriggerEvent::Triggered, this, &ACXPawn::ToggleCamera);
 
 		// reset the vehicle 
-		EnhancedInputComponent->BindAction(ResetVehicleAction, ETriggerEvent::Triggered, this, &ACXPawn::ResetVehicle);
+		EnhancedInputComponent->BindAction(ResetVehicleAction, ETriggerEvent::Started, this, &ACXPawn::ResetVehicle);
 	}
 	else
 	{
@@ -105,6 +210,7 @@ void ACXPawn::SetupPlayerInputComponent(class UInputComponent* PlayerInputCompon
 void ACXPawn::Tick(float Delta)
 {
 	Super::Tick(Delta);
+    ApplyControlRestrictions();
 
 	// add some angular damping if the vehicle is in midair
 	bool bMovingOnGround = ChaosVehicleMovement->IsMovingOnGround();
@@ -137,7 +243,7 @@ void ACXPawn::Tick(float Delta)
 
 float ACXPawn::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-    if (!HasAuthority() || !FMath::IsFinite(DamageAmount) || DamageAmount <= 0.0f || DamageCauser == this)
+    if (!HasAuthority() || !IsMatchPlaying() || !FMath::IsFinite(DamageAmount) || DamageAmount <= 0.0f || DamageCauser == this)
     {
         return 0.0f;
     }
@@ -152,25 +258,60 @@ float ACXPawn::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, A
     {
         return 0.0f;
     }
+    constexpr int32 TransferCoinAmount = 5;
+    if (VictimState->GetCoins() < TransferCoinAmount || AttackerState->GetCoins() > MAX_int32 - TransferCoinAmount)
+    {
+        return 0.0f;
+    }
     const float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
-    if (!FMath::IsFinite(ActualDamage) || ActualDamage < 1.0f || ActualDamage >= static_cast<float>(MAX_int32))
+    if (!FMath::IsFinite(ActualDamage) || ActualDamage <= 0.0f)
     {
         return 0.0f;
     }
-    const int32 TransferCoinAmount = static_cast<int32>(ActualDamage);
-    if (AttackerState->GetCoins() > MAX_int32 - TransferCoinAmount || !VictimState->TryRemoveCoins(TransferCoinAmount))
-    {
-        UE_LOG(LogTemplateVehicle, Display, TEXT("Attack transfer rejected: %s -> %s"), *GetNameSafe(VictimState), *GetNameSafe(AttackerState));
-        return 0.0f;
-    }
+    if (!VictimState->TryRemoveCoins(TransferCoinAmount)) return 0.0f;
     AttackerState->AddCoins(TransferCoinAmount);
+    if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+    {
+        const FPointDamageEvent& PointEvent = static_cast<const FPointDamageEvent&>(DamageEvent);
+        const FName Bone = PointEvent.HitInfo.BoneName;
+        const bool bWheelBone = ChaosVehicleMovement->WheelSetups.ContainsByPredicate(
+            [Bone](const FChaosWheelSetup& Setup) { return !Bone.IsNone() && Setup.BoneName == Bone; });
+        if (bWheelBone)
+        {
+            VictimState->ApplyWheelSpeedPenalty(WheelHitPenalty);
+            UE_LOG(LogTemplateVehicle, Display, TEXT("Wheel point hit: %s bone=%s"), *GetName(), *Bone.ToString());
+        }
+    }
     UE_LOG(LogTemplateVehicle, Display, TEXT("Attack transferred %d coins: %s -> %s"), TransferCoinAmount, *VictimState->GetPlayerName(), *AttackerState->GetPlayerName());
     return ActualDamage;
 }
 
 void ACXPawn::InputAttack(const FInputActionValue& Value)
 {
-    CTSAttack();
+    if (IsMatchPlaying()) CTSAttack();
+}
+
+void ACXPawn::InputPlaceMine(const FInputActionValue& Value)
+{
+    if (IsMatchPlaying()) ServerPlaceMine();
+}
+
+void ACXPawn::ServerPlaceMine_Implementation()
+{
+    if (!GetWorld() || !IsMatchPlaying() || !MineClass || GetWorld()->GetTimeSeconds() - LastMineTime < MineCooldown) return;
+    const FBoxSphereBounds Bounds = GetMesh()->CalcBounds(FTransform::Identity);
+    const FVector Rear = GetMesh()->GetComponentTransform().TransformPosition(
+        FVector(Bounds.Origin.X - Bounds.BoxExtent.X - 200.0f, Bounds.Origin.Y, Bounds.Origin.Z));
+    FHitResult Ground;
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(MineGround), false, this);
+    if (!GetWorld()->LineTraceSingleByChannel(Ground, Rear + FVector(0,0,300), Rear - FVector(0,0,1200), ECC_Visibility, Query)
+        || Ground.ImpactNormal.Z < 0.5f || Cast<ACXPawn>(Ground.GetActor())) return;
+    FActorSpawnParameters Params;
+    Params.Owner = this;
+    Params.Instigator = this;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    if (GetWorld()->SpawnActor<ACXMine>(MineClass, Ground.ImpactPoint + FVector(0,0,20), FRotator::ZeroRotator, Params))
+        LastMineTime = GetWorld()->GetTimeSeconds();
 }
 
 void ACXPawn::MulticastHitEffect_Implementation(const FVector& TraceStart, const FVector& TraceEnd, bool bHitVehicle, const FVector& ImpactPoint, const FVector& ImpactNormal)
@@ -193,13 +334,14 @@ void ACXPawn::MulticastHitEffect_Implementation(const FVector& TraceStart, const
 void ACXPawn::CTSAttack_Implementation()
 {
     UWorld* World = GetWorld();
-    if (!World)
+    if (!World || !IsMatchPlaying() || World->GetTimeSeconds() - LastAttackTime < AttackCooldown)
     {
         return;
     }
+    LastAttackTime = World->GetTimeSeconds();
     const FBoxSphereBounds LocalMeshBounds = GetMesh()->CalcBounds(FTransform::Identity);
     const FVector LocalFrontBumper(
-        LocalMeshBounds.Origin.X + LocalMeshBounds.BoxExtent.X,
+        LocalMeshBounds.Origin.X + LocalMeshBounds.BoxExtent.X - 5.0f,
         LocalMeshBounds.Origin.Y,
         LocalMeshBounds.Origin.Z);
     const FVector Start = GetMesh()->GetComponentTransform().TransformPosition(LocalFrontBumper);
@@ -211,7 +353,9 @@ void ACXPawn::CTSAttack_Implementation()
     ACXPawn* Victim = bHit ? Cast<ACXPawn>(HitResult.GetActor()) : nullptr;
     if (IsValid(Victim))
     {
-        UGameplayStatics::ApplyDamage(Victim, 5.0f, GetController(), this, nullptr);
+        if (UPrimitiveComponent* HitComponent = HitResult.GetComponent(); HitComponent && HitComponent->ComponentHasTag(TEXT("CXWheelHitbox")))
+            HitResult.BoneName = HitComponent->GetAttachSocketName();
+        UGameplayStatics::ApplyPointDamage(Victim, 5.0f, GetActorForwardVector(), HitResult, GetController(), this, nullptr);
     }
     MulticastHitEffect(Start, bHit ? HitResult.ImpactPoint : End, IsValid(Victim), HitResult.ImpactPoint, HitResult.ImpactNormal);
 }
@@ -219,7 +363,7 @@ void ACXPawn::CTSAttack_Implementation()
 void ACXPawn::Steering(const FInputActionValue& Value)
 {
 	// get the input magnitude for steering
-	float SteeringValue = Value.Get<float>();
+	float SteeringValue = IsMatchPlaying() ? Value.Get<float>() : 0.0f;
 
 	// add the input
 	ChaosVehicleMovement->SetSteeringInput(SteeringValue);
@@ -228,7 +372,7 @@ void ACXPawn::Steering(const FInputActionValue& Value)
 void ACXPawn::Throttle(const FInputActionValue& Value)
 {
 	// get the input magnitude for the throttle
-	float ThrottleValue = Value.Get<float>();
+	float ThrottleValue = IsMatchPlaying() && !IsThrottleDisabled() ? Value.Get<float>() : 0.0f;
 
 	// add the input
 	ChaosVehicleMovement->SetThrottleInput(ThrottleValue);
@@ -260,6 +404,8 @@ void ACXPawn::StopBrake(const FInputActionValue& Value)
 
 void ACXPawn::StartHandbrake(const FInputActionValue& Value)
 {
+    if (!IsMatchPlaying()) return;
+    bManualHandbrake = true;
 	// add the input
 	ChaosVehicleMovement->SetHandbrakeInput(true);
 
@@ -269,6 +415,8 @@ void ACXPawn::StartHandbrake(const FInputActionValue& Value)
 
 void ACXPawn::StopHandbrake(const FInputActionValue& Value)
 {
+    if (!IsMatchPlaying()) return;
+    bManualHandbrake = false;
 	// add the input
 	ChaosVehicleMovement->SetHandbrakeInput(false);
 
@@ -296,12 +444,12 @@ void ACXPawn::ToggleCamera(const FInputActionValue& Value)
 
 void ACXPawn::ResetVehicle(const FInputActionValue& Value)
 {
-    ServerResetVehicle();
+    if (IsMatchPlaying()) ServerResetVehicle();
 }
 
 void ACXPawn::ServerResetVehicle_Implementation()
 {
-    if (!GetWorld() || GetWorld()->GetTimeSeconds() - LastVehicleResetTime < 2.0) return;
+    if (!GetWorld() || !IsMatchPlaying() || GetWorld()->GetTimeSeconds() - LastVehicleResetTime < 2.0) return;
     LastVehicleResetTime = GetWorld()->GetTimeSeconds();
 	// reset to a location slightly above our current one
 	FVector ResetLocation = GetActorLocation() + FVector(0.0f, 0.0f, 50.0f);

@@ -10,6 +10,7 @@ class UParticleSystem;
 class UCameraComponent;
 class USpringArmComponent;
 class UInputAction;
+class ACXMine;
 class UChaosWheeledVehicleMovementComponent;
 struct FInputActionValue;
 
@@ -79,6 +80,21 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
 	TObjectPtr<UInputAction> AttackAction;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
+    TObjectPtr<UInputAction> MineAction;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Mine")
+    TSubclassOf<ACXMine> MineClass;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Mine", meta = (ClampMin = "0.1"))
+    float MineCooldown = 3.0f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Attack", meta = (ClampMin = "0.1"))
+    float AttackCooldown = 0.35f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Attack", meta = (ClampMin = "1.0"))
+    float WheelHitPenalty = 20.0f;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     TObjectPtr<UParticleSystem> HitParticle;
 
@@ -97,10 +113,27 @@ public:
 	// Begin Actor interface
 
 	virtual void Tick(float Delta) override;
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
 	UFUNCTION(Server, Reliable)
 	void CTSAttack();
+
+    UFUNCTION(Server, Reliable)
+    void ServerPlaceMine();
+
+    UFUNCTION(BlueprintPure, Category = "Match")
+    bool IsMatchPlaying() const;
+
+    UFUNCTION(BlueprintPure, Category = "Mine")
+    bool IsThrottleDisabled() const;
+
+    UFUNCTION(BlueprintPure, Category = "Mine")
+    float GetThrottleDisabledRemaining() const;
+
+    void ApplyThrottleFailure(float Duration);
 
     UFUNCTION(NetMulticast, Unreliable)
     void MulticastHitEffect(const FVector& TraceStart, const FVector& TraceEnd, bool bHitVehicle, const FVector& ImpactPoint, const FVector& ImpactNormal);
@@ -110,6 +143,21 @@ public:
 protected:
 
 	void InputAttack(const FInputActionValue& Value);
+    void InputPlaceMine(const FInputActionValue& Value);
+    void ApplyControlRestrictions();
+    void ClearThrottleFailure();
+
+    UFUNCTION()
+    void OnRep_ThrottleDisabledUntil();
+
+    UPROPERTY(ReplicatedUsing = OnRep_ThrottleDisabledUntil)
+    double ThrottleDisabledUntil = 0.0;
+
+    FTimerHandle ThrottleFailureTimer;
+    double LastMineTime = -100.0;
+    double LastAttackTime = -100.0;
+    bool bPhaseHandbrakeLocked = true;
+    bool bManualHandbrake = false;
 
     /** Base cap in km/h; the owner-only speed bonus is added on server and owning client. */
     UPROPERTY(EditDefaultsOnly, Category = "Vehicle|Speed", meta=(ClampMin="1.0"))

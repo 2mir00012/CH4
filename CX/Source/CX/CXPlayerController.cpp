@@ -74,7 +74,13 @@ void ACXPlayerController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 
 	// get a pointer to the controlled pawn
-	VehiclePawn = CastChecked<ACXPawn>(InPawn);
+	VehiclePawn = Cast<ACXPawn>(InPawn);
+}
+
+void ACXPlayerController::OnUnPossess()
+{
+    VehiclePawn = nullptr;
+    Super::OnUnPossess();
 }
 
 void ACXPlayerController::CTSChatMessage_Implementation(const FString& Message)

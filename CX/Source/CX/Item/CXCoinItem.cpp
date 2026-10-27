@@ -49,7 +49,7 @@ void ACXCoinItem::OnOverlapSphereBeginOverlap(UPrimitiveComponent* OverlappedCom
     }
     ACXPawn* VehiclePawn = Cast<ACXPawn>(OtherActor);
     ACXPlayerState* PlayerState = IsValid(VehiclePawn) ? VehiclePawn->GetPlayerState<ACXPlayerState>() : nullptr;
-    if (!IsValid(PlayerState))
+    if (!IsValid(PlayerState) || !VehiclePawn->IsMatchPlaying())
     {
         return;
     }
